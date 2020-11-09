@@ -14,6 +14,10 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static com.example.demo.security.ApplicationUserRole.*;
 import static com.example.demo.security.ApplicationUserPermission.*;
@@ -35,27 +39,37 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
-                .csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()) // can disable only preparing application for not browser client using
-                .and()
+                .csrf().disable()
                 .authorizeRequests()
                 .antMatchers("/", "index", "/css/*", "/js/*").permitAll()
                 .antMatchers("/api/**").hasRole(STUDENT.name())
-//                .antMatchers(HttpMethod.DELETE, "/managment/api/**").hasAuthority(COURSE_WRITE.getPermission())
-//                .antMatchers(HttpMethod.POST, "/managment/api/**").hasAuthority(COURSE_WRITE.getPermission())
-//                .antMatchers(HttpMethod.PUT, "/managment/api/**").hasAuthority(COURSE_WRITE.getPermission())
-//                .antMatchers("/managment/api/**").hasAnyRole(ADMIN.name(), ADMINTRAINEE.name())
                 .anyRequest()
                 .authenticated()
                 .and()
-                .httpBasic();
+                .formLogin()
+                .loginPage("/login").permitAll()
+                .defaultSuccessUrl("/courses", true)
+                .and()
+                .rememberMe()
+                    .tokenValiditySeconds((int)TimeUnit.DAYS.toSeconds(21))
+                    .key("somethingverysecured")
+                .and()
+                .logout()
+                    .logoutUrl("/logout")
+                //BURY IN MIND TO USE POST TO LOGOUT. it's possible to not under because crf is disabled
+                    .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET"))
+                    .clearAuthentication(true)
+                    .invalidateHttpSession(true)
+                    .deleteCookies("JSESSIONID", "remember-me", "XSRF-TOKEN")
+                    .logoutSuccessUrl("/login");
     }
     @Override
     @Bean
     protected UserDetailsService userDetailsService(){
         UserDetails annaSmithUser = User.builder()
-                .username("annfasmith")
+                .username("annasmith")
                 .password(passwordEncoder.encode("password"))
-//                .roles(STUDENT.name()) // ROLE_STUDENT
+//                .role     s(STUDENT.name()) // ROLE_STUDENT
                 .authorities(STUDENT.getGrantedAuthorities())
                 .build();
 
